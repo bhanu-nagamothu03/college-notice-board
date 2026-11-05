@@ -1,0 +1,231 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+void main() {
+  runApp(
+    ChangeNotifierProvider<NoticeBoardModel>(
+      create: (context) => NoticeBoardModel(),
+      builder: (context, child) => const CollegeNoticeBoardApp(),
+    ),
+  );
+}
+
+class CollegeNoticeBoardApp extends StatelessWidget {
+  const CollegeNoticeBoardApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'College Notice Board',
+      theme: ThemeData(
+        colorSchemeSeed: Colors.indigo,
+        useMaterial3: true,
+      ),
+      home: const NoticeListScreen(),
+      debugShowCheckedModeBanner: false,
+    );
+  }
+}
+
+class Notice {
+  final String id;
+  final String title;
+  final String date;
+  final String department;
+  final String description;
+
+  Notice({
+    required this.id,
+    required this.title,
+    required this.date,
+    required this.department,
+    required this.description,
+  });
+}
+
+class NoticeBoardModel extends ChangeNotifier {
+  final List<Notice> _notices = [
+    Notice(
+      id: '1',
+      title: 'End Semester Examination Schedule',
+      date: '2026-06-10',
+      department: 'All Departments',
+      description: 'The end semester examinations for all UG and PG programs will commence from July 1st, 2026.',
+    ),
+    Notice(
+      id: '2',
+      title: 'Hackathon 2026 Registration Open',
+      date: '2026-06-08',
+      department: 'Computer Science',
+      description: 'Department of Computer Science is hosting an annual 24-hour coding hackathon.',
+    ),
+  ];
+
+  String _selectedDepartmentFilter = 'All';
+
+  final List<String> _departments = [
+    'All',
+    'All Departments',
+    'Computer Science',
+    'Electronics',
+    'Mechanical',
+    'Civil',
+  ];
+
+  List<Notice> get notices => _notices;
+  String get selectedDepartmentFilter => _selectedDepartmentFilter;
+  List<String> get departments => _departments;
+
+  List<Notice> get filteredNotices => _notices.where((notice) {
+        if (_selectedDepartmentFilter == 'All' || _selectedDepartmentFilter == 'All Departments') {
+          return true;
+        }
+        return notice.department == _selectedDepartmentFilter;
+      }).toList();
+
+  void setFilter(String filter) {
+    _selectedDepartmentFilter = filter;
+    notifyListeners();
+  }
+
+  void addNotice(Notice notice) {
+    _notices.insert(0, notice);
+    notifyListeners();
+  }
+}
+
+class NoticeListScreen extends StatelessWidget {
+  const NoticeListScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final model = Provider.of<NoticeBoardModel>(context);
+    return Scaffold(
+      appBar: AppBar(title: const Text('College Notice Board')),
+      body: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            color: Colors.indigo.shade50,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Filter by Dept:', style: TextStyle(fontWeight: FontWeight.bold)),
+                DropdownButton<String>(
+                  value: model.selectedDepartmentFilter,
+                  onChanged: (String? newValue) {
+                    if (newValue != null) model.setFilter(newValue);
+                  },
+                  items: model.departments.map<DropdownMenuItem<String>>((String value) {
+                    return DropdownMenuItem<String>(value: value, child: Text(value));
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              itemCount: model.filteredNotices.length,
+              itemBuilder: (context, index) {
+                final notice = model.filteredNotices[index];
+                return Card(
+                  margin: const EdgeInsets.all(8),
+                  child: ListTile(
+                    title: Text(notice.title),
+                    subtitle: Text('${notice.department} • ${notice.date}'),
+                    isThreeLine: true,
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: Text(notice.title),
+                          content: Text(notice.description),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close'))
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const AddNoticeScreen()),
+        ),
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+}
+
+class AddNoticeScreen extends StatefulWidget {
+  const AddNoticeScreen({super.key});
+
+  @override
+  State<AddNoticeScreen> createState() => _AddNoticeScreenState();
+}
+
+class _AddNoticeScreenState extends State<AddNoticeScreen> {
+  final _titleController = TextEditingController();
+  final _descController = TextEditingController();
+  late String _selectedDept;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDept = 'Computer Science';
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final model = Provider.of<NoticeBoardModel>(context, listen: false);
+    return Scaffold(
+      appBar: AppBar(title: const Text('New Notice')),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            TextField(controller: _titleController, decoration: const InputDecoration(labelText: 'Title')),
+            TextField(controller: _descController, decoration: const InputDecoration(labelText: 'Description')),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              // ignore: deprecated_member_use
+              value: _selectedDept,
+              items: model.departments.where((d) => d != 'All').map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+              onChanged: (v) => setState(() => _selectedDept = v!),
+              decoration: const InputDecoration(labelText: 'Department'),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () {
+                if (_titleController.text.isEmpty) return;
+                model.addNotice(Notice(
+                  id: DateTime.now().toString(),
+                  title: _titleController.text,
+                  date: DateTime.now().toString().split(' ')[0],
+                  department: _selectedDept,
+                  description: _descController.text,
+                ));
+                Navigator.pop(context);
+              },
+              child: const Text('Post'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
